@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>redakt dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1120;
+      --panel: #111827;
+      --panel-soft: #172033;
+      --border: #263244;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --primary: #60a5fa;
+      --primary-strong: #2563eb;
+      --danger: #f87171;
+      --success: #34d399;
+      --warning: #fbbf24;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+
+    header {
+      padding: 24px;
+      border-bottom: 1px solid var(--border);
+      background: #0f172a;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    section {
+      margin-bottom: 22px;
+      padding: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    h1, h2, h3, p {
+      margin-top: 0;
+    }
+
+    h1 {
+      margin-bottom: 6px;
+      font-size: 26px;
+    }
+
+    h2 {
+      margin-bottom: 10px;
+      font-size: 19px;
+    }
+
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 15px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 650;
+    }
+
+    input, textarea {
+      width: 100%;
+      padding: 10px 11px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #0b1220;
+      color: var(--text);
+      font: inherit;
+    }
+
+    input:focus, textarea:focus {
+      outline: 2px solid rgba(96, 165, 250, 0.35);
+      border-color: var(--primary);
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    button {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: #1f2937;
+      color: var(--text);
+      cursor: pointer;
+      font: inherit;
+    }
+
+    button:hover {
+      border-color: var(--primary);
+    }
+
+    button.primary {
+      border-color: var(--primary-strong);
+      background: var(--primary-strong);
+      color: white;
+    }
+
+    button.danger {
+      border-color: rgba(248, 113, 113, 0.55);
+      color: var(--danger);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 11px 10px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--panel-soft);
+      color: #cbd5e1;
+      font-weight: 700;
+    }
+
+    code, pre {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    code {
+      color: #bfdbfe;
+      overflow-wrap: anywhere;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      padding: 12px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+    }
+
+    .subtle {
+      color: var(--muted);
+    }
+
+    .help {
+      padding: 12px;
+      margin-bottom: 14px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #cbd5e1;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .help strong {
+      color: var(--text);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .full {
+      grid-column: 1 / -1;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .status {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: #0b1220;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .enabled {
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .disabled {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(2, 6, 23, 0.74);
+      z-index: 20;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal {
+      width: min(680px, 100%);
+      padding: 20px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        padding: 12px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+
+      table, thead, tbody, th, td, tr {
+        display: block;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tr {
+        border-bottom: 1px solid var(--border);
+        padding: 10px 0;
+      }
+
+      td {
+        border: 0;
+        padding: 6px 0;
+      }
+
+      td::before {
+        content: attr(data-label) ": ";
+        color: var(--muted);
+        font-weight: 700;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>redakt dashboard</h1>
+    <div class="subtle">Manage regex redaction rules and test output locally.</div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Rules</h2>
+      <div class="help">
+        <strong>Priority</strong> decides which rule wins when two matches overlap. Higher numbers win. Use `0` for normal rules and increase it for more specific rules, such as Aadhaar over a generic number pattern.
+        <br>
+        <strong>Built-in</strong> rules are the defaults shipped with redakt. You can disable or edit them here, and `Reset defaults` restores the shipped set.
+      </div>
+      <p id="status" class="status">Loading rules...</p>
+      <div class="actions" style="margin-bottom: 12px;">
+        <button onclick="loadRules()">Refresh</button>
+        <button class="danger" onclick="resetRules()">Reset defaults</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Label</th>
+            <th>Pattern</th>
+            <th>Status</th>
+            <th>Priority</th>
+            <th>Description</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="rules-body"></tbody>
+      </table>
+    </section>
+
+    <section>
+      <h2>Add Rule</h2>
+      <p class="subtle">Add a regex rule for your own identifiers. Labels become tokens like <code>[PII_EMPLOYEE_ID_1]</code>.</p>
+      <form id="rule-form" class="grid">
+        <div>
+          <label for="label">Label</label>
+          <input id="label" name="label" placeholder="EMPLOYEE_ID" required>
+        </div>
+        <div>
+          <label for="priority">Priority</label>
+          <input id="priority" name="priority" type="number" value="0">
+        </div>
+        <div class="full">
+          <label for="pattern">Regex Pattern</label>
+          <input id="pattern" name="pattern" placeholder="EMP-\d{5}" required>
+        </div>
+        <div class="full">
+          <label for="description">Description</label>
+          <input id="description" name="description" placeholder="Employee IDs">
+        </div>
+        <div class="full actions">
+          <button class="primary" type="submit">Add rule</button>
+        </div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Try Redaction</h2>
+      <p class="subtle">This uses the currently enabled rules from your `rules.json` file.</p>
+      <label for="input-text">Input Text</label>
+      <textarea id="input-text" placeholder="Email test@example.com and PAN ABCDE1234F"></textarea>
+      <div class="actions" style="margin-top: 10px;">
+        <button class="primary" onclick="redactText()">Redact</button>
+      </div>
+      <h3>Output</h3>
+      <pre id="redact-output">No output yet.</pre>
+    </section>
+  </main>
+
+  <div id="edit-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="edit-title">Edit Rule</h2>
+          <div id="edit-label-display" class="subtle"></div>
+        </div>
+        <button type="button" onclick="closeEditModal()">Close</button>
+      </div>
+      <form id="edit-form" class="grid">
+        <input id="edit-label" type="hidden">
+        <div class="full">
+          <label for="edit-pattern">Regex Pattern</label>
+          <input id="edit-pattern" required>
+        </div>
+        <div>
+          <label for="edit-priority">Priority</label>
+          <input id="edit-priority" type="number" required>
+        </div>
+        <div>
+          <label for="edit-enabled">Status</label>
+          <select id="edit-enabled" style="width: 100%; padding: 10px 11px; border: 1px solid var(--border); border-radius: 7px; background: #0b1220; color: var(--text); font: inherit;">
+            <option value="true">Enabled</option>
+            <option value="false">Disabled</option>
+          </select>
+        </div>
+        <div class="full">
+          <label for="edit-description">Description</label>
+          <input id="edit-description">
+        </div>
+        <div class="full actions">
+          <button class="primary" type="submit">Save changes</button>
+          <button type="button" onclick="closeEditModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const statusEl = document.getElementById("status");
+    const rulesBody = document.getElementById("rules-body");
+    const ruleForm = document.getElementById("rule-form");
+    const editModal = document.getElementById("edit-modal");
+    const editForm = document.getElementById("edit-form");
+    let currentRules = [];
+
+    function setStatus(message) {
+      statusEl.textContent = message;
+    }
+
+    async function request(path, options = {}) {
+      const response = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      const text = await response.text();
+      const data = text ? JSON.parse(text) : null;
+      if (!response.ok) {
+        throw new Error(data && data.detail ? data.detail : "Request failed");
+      }
+      return data;
+    }
+
+    function renderRules(rules) {
+      currentRules = rules;
+      rulesBody.innerHTML = "";
+      for (const rule of rules) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td data-label="Label"><strong>${escapeHtml(rule.label)}</strong>${rule.builtin ? "<br><span class=\"pill\">built-in</span>" : ""}</td>
+          <td data-label="Pattern"><code>${escapeHtml(rule.pattern || "")}</code></td>
+          <td data-label="Status" class="${rule.enabled ? "enabled" : "disabled"}">${rule.enabled ? "enabled" : "disabled"}</td>
+          <td data-label="Priority">${rule.priority}</td>
+          <td data-label="Description">${escapeHtml(rule.description || "")}</td>
+          <td data-label="Actions">
+            <div class="actions">
+              <button data-action="toggle" data-label="${escapeHtml(rule.label)}">${rule.enabled ? "Disable" : "Enable"}</button>
+              <button data-action="edit" data-label="${escapeHtml(rule.label)}">Edit</button>
+              <button class="danger" data-action="delete" data-label="${escapeHtml(rule.label)}">Delete</button>
+            </div>
+          </td>
+        `;
+        rulesBody.appendChild(row);
+      }
+      setStatus(`${rules.length} rules loaded.`);
+    }
+
+    async function loadRules() {
+      try {
+        setStatus("Loading rules...");
+        renderRules(await request("/api/rules"));
+      } catch (error) {
+        setStatus(error.message);
+      }
+    }
+
+    rulesBody.addEventListener("click", async (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+
+      const rule = currentRules.find((item) => item.label === button.dataset.label);
+      if (!rule) return;
+
+      if (button.dataset.action === "toggle") {
+        await toggleRule(rule.label, rule.enabled);
+      } else if (button.dataset.action === "edit") {
+        openEditModal(rule);
+      } else if (button.dataset.action === "delete") {
+        await deleteRule(rule.label);
+      }
+    });
+
+    async function toggleRule(label, enabled) {
+      try {
+        await request(`/api/rules/${encodeURIComponent(label)}/${enabled ? "disable" : "enable"}`, { method: "POST" });
+        await loadRules();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function deleteRule(label) {
+      if (!confirm(`Delete rule ${label}?`)) return;
+      try {
+        await request(`/api/rules/${encodeURIComponent(label)}`, { method: "DELETE" });
+        await loadRules();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    function openEditModal(rule) {
+      document.getElementById("edit-label").value = rule.label;
+      document.getElementById("edit-label-display").textContent = rule.label;
+      document.getElementById("edit-pattern").value = rule.pattern || "";
+      document.getElementById("edit-priority").value = rule.priority;
+      document.getElementById("edit-description").value = rule.description || "";
+      document.getElementById("edit-enabled").value = String(rule.enabled);
+      editModal.classList.add("open");
+      document.getElementById("edit-pattern").focus();
+    }
+
+    function closeEditModal() {
+      editModal.classList.remove("open");
+    }
+
+    editModal.addEventListener("click", (event) => {
+      if (event.target === editModal) closeEditModal();
+    });
+
+    editForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const label = document.getElementById("edit-label").value;
+      try {
+        await request(`/api/rules/${encodeURIComponent(label)}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            pattern: document.getElementById("edit-pattern").value,
+            description: document.getElementById("edit-description").value,
+            priority: Number(document.getElementById("edit-priority").value || 0),
+            enabled: document.getElementById("edit-enabled").value === "true",
+          }),
+        });
+        closeEditModal();
+        await loadRules();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    async function resetRules() {
+      if (!confirm("Reset all rules to defaults? Custom rules will be removed.")) return;
+      try {
+        renderRules(await request("/api/rules/reset", { method: "POST" }));
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function redactText() {
+      const text = document.getElementById("input-text").value;
+      const output = document.getElementById("redact-output");
+      try {
+        const result = await request("/api/redact", {
+          method: "POST",
+          body: JSON.stringify({ text }),
+        });
+        output.textContent = JSON.stringify(result, null, 2);
+      } catch (error) {
+        output.textContent = error.message;
+      }
+    }
+
+    ruleForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = new FormData(ruleForm);
+      try {
+        await request("/api/rules", {
+          method: "POST",
+          body: JSON.stringify({
+            label: form.get("label"),
+            pattern: form.get("pattern"),
+            description: form.get("description"),
+            priority: Number(form.get("priority") || 0),
+            enabled: true,
+          }),
+        });
+        ruleForm.reset();
+        document.getElementById("priority").value = "0";
+        await loadRules();
+      } catch (error) {
+        alert(error.message);
+      }
+    });
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    loadRules();
+  </script>
+</body>
+</html>
