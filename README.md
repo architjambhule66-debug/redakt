@@ -176,3 +176,7 @@ redakt redact "Email test@example.com" --json
 ```bash
 uv run pytest
 ```
+
+## Releases
+
+Release automation is documented in [`RELEASE.md`](RELEASE.md). GitHub tags are used to publish matching package versions to TestPyPI and PyPI.

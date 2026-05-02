@@ -1,0 +1,57 @@
+name: Publish to TestPyPI
+
+on:
+  push:
+    tags:
+      - "v*rc*"
+
+jobs:
+  publish-testpypi:
+    name: Build and publish to TestPyPI
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+
+      - name: Install dependencies
+        run: uv sync --extra dashboard --dev
+
+      - name: Check tag matches pyproject version
+        run: |
+          uv run python - <<'PY'
+          import os
+          import tomllib
+
+          tag = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          with open("pyproject.toml", "rb") as file:
+              version = tomllib.load(file)["project"]["version"]
+          if tag != version:
+              raise SystemExit(f"Tag {tag!r} does not match pyproject version {version!r}")
+          PY
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Build package
+        run: uv build
+
+      - name: Check package metadata
+        run: uv run --with twine twine check dist/*
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
