@@ -1,14 +1,17 @@
 import copy
+import hashlib
 from typing import List, Optional
-from redakt.rules import DEFAULT_RULES, DetectionMethod, RedactionMatch, RedactionResult, Rule, _resolve_spans
+from redakt.rules import DEFAULT_RULES, DetectionMethod, RedactionMatch, RedactionMode, RedactionResult, Rule, _resolve_spans
 from redakt import ner as _ner
 
 class Redactor:
-    def __init__(self, rules: Optional[List[Rule]] = None, token_format: str = "[PII_{label}_{n}]", use_ner: bool = True, ner_language: str = "en") -> None:
+    def __init__(self, rules: Optional[List[Rule]] = None, token_format: str = "[PII_{label}_{n}]", use_ner: bool = True, ner_language: str = "en", mode: str = RedactionMode.REPLACE.value, hash_salt: str = "") -> None:
         self._rules: List[Rule] = []
         self.token_format = token_format
         self.use_ner = use_ner and _ner.is_available()
         self.ner_language = ner_language
+        self.mode = RedactionMode(mode)
+        self.hash_salt = hash_salt
 
         for rule in (DEFAULT_RULES if rules is None else rules):
             self.add_rule(rule)
@@ -87,11 +90,13 @@ class Redactor:
             n = label_counters[label]
             token = self.token_format.format(label=label, n=n)
             original = text[start:end]
-            token_map[token] = original
-            replacements.append((start, end, token))
+            replacement = self._replacement_text(original, label, token)
+            if self.mode == RedactionMode.REPLACE:
+                token_map[token] = original
+            replacements.append((start, end, replacement))
             matches.append(RedactionMatch(
                 original=original,
-                token=token,
+                token=replacement,
                 label=label,
                 start=start,
                 end=end,
@@ -106,8 +111,48 @@ class Redactor:
             original_text=text,
             matches=matches,
             token_map=token_map,
+            mode=self.mode.value,
         )
 
     def redact_batch(self, texts: List[str]) -> List[RedactionResult]:
         """Redact a list of texts."""
         return [self.redact(t) for t in texts]
+
+    def _replacement_text(self, original: str, label: str, token: str) -> str:
+        if self.mode == RedactionMode.REPLACE:
+            return token
+        if self.mode == RedactionMode.REMOVE:
+            return ""
+        if self.mode == RedactionMode.HASH:
+            digest = hashlib.sha256(f"{self.hash_salt}{label}:{original}".encode("utf-8")).hexdigest()
+            return f"sha256:{digest[:16]}"
+        return _mask_value(original)
+
+
+def _mask_value(value: str) -> str:
+    if "@" in value and value.count("@") == 1:
+        local, domain = value.split("@", 1)
+        if not local:
+            return f"***@{domain}"
+        return f"{local[0]}{'*' * max(1, len(local) - 1)}@{domain}"
+
+    alnum_positions = [index for index, char in enumerate(value) if char.isalnum()]
+    if not alnum_positions:
+        return value
+
+    has_letters = any(char.isalpha() for char in value)
+    has_digits = any(char.isdigit() for char in value)
+    preserve_start = 1 if len(alnum_positions) > 2 else 0
+    preserve_end = 5 if has_letters and has_digits and len(alnum_positions) > 6 else 4 if len(alnum_positions) > 4 else 1
+    preserve = set(alnum_positions[:preserve_start])
+    preserve.update(alnum_positions[-preserve_end:])
+
+    chars: list[str] = []
+    for index, char in enumerate(value):
+        if not char.isalnum() or index in preserve:
+            chars.append(char)
+        elif char.isdigit():
+            chars.append("X")
+        else:
+            chars.append("*")
+    return "".join(chars)

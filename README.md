@@ -48,6 +48,26 @@ Example output:
 Email [PII_EMAIL_1] and PAN [PII_PAN_1]
 ```
 
+Change the redaction mode when you need different output:
+
+```python
+from redakt import Redactor
+
+print(Redactor(mode="replace").redact("Email test@example.com").redacted_text)
+print(Redactor(mode="mask").redact("Email test@example.com").redacted_text)
+print(Redactor(mode="remove").redact("Email test@example.com").redacted_text)
+print(Redactor(mode="hash", hash_salt="secret").redact("Email test@example.com").redacted_text)
+```
+
+Modes:
+
+- `replace`: token output like `[PII_EMAIL_1]`
+- `mask`: keeps some shape, for example `t***@example.com`
+- `remove`: removes the matched text entirely
+- `hash`: deterministic `sha256:...` replacement, optionally salted
+
+`restore()` is available only in `replace` mode.
+
 ## Default Rules
 
 `Redactor()` loads the default rules automatically.
@@ -159,6 +179,14 @@ Redact text from the terminal:
 redakt redact "Email test@example.com"
 ```
 
+Choose a mode:
+
+```bash
+redakt redact "Email test@example.com" --mode mask
+redakt redact "Email test@example.com" --mode remove
+redakt redact "Email test@example.com" --mode hash --hash-salt my-secret
+```
+
 Use a rules file:
 
 ```bash
@@ -170,6 +198,33 @@ Print the full JSON result:
 ```bash
 redakt redact "Email test@example.com" --json
 ```
+
+Manage a `rules.json` file from the terminal:
+
+```bash
+redakt rules init
+redakt rules list
+redakt rules add EMPLOYEE_ID 'EMP-\d{5}' --description "Employee IDs" --priority 5
+redakt rules disable AADHAAR
+redakt rules enable AADHAAR
+redakt rules remove EMPLOYEE_ID
+redakt rules reset
+```
+
+Use a custom rules file path:
+
+```bash
+redakt rules --rules ./config/rules.json init
+redakt rules --rules ./config/rules.json add EMPLOYEE_ID 'EMP-\d{5}'
+redakt redact "Employee EMP-12345" --rules ./config/rules.json
+```
+
+Rule command notes:
+
+- `rules init` creates defaults and refuses to overwrite unless `--force` is used.
+- `rules list --json` prints machine-readable rule data.
+- `rules add --replace` updates an existing rule with the same label.
+- Higher `priority` wins when two rules match overlapping text.
 
 ## Run Tests
 

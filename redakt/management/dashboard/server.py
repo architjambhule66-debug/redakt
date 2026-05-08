@@ -32,6 +32,8 @@ class RuleUpdatePayload(BaseModel):
 
 class RedactPayload(BaseModel):
     text: str = ""
+    mode: str = "replace"
+    hash_salt: str = ""
 
 
 def create_app(rules_path: str | Path | None = None) -> FastAPI:
@@ -117,9 +119,13 @@ def create_app(rules_path: str | Path | None = None) -> FastAPI:
     @app.post("/api/redact")
     def redact(payload: RedactPayload) -> dict[str, Any]:
         rules = store.load_or_create_defaults()
-        result = Redactor(rules=rules).redact(payload.text)
+        try:
+            result = Redactor(rules=rules, mode=payload.mode, hash_salt=payload.hash_salt).redact(payload.text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {
             "redacted_text": result.redacted_text,
+            "mode": result.mode,
             "pii_count": result.pii_count,
             "labels_found": result.labels_found,
             "matches": [match.__dict__ for match in result.matches],

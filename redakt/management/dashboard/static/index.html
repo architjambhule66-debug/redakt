@@ -76,7 +76,7 @@
       font-weight: 650;
     }
 
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       padding: 10px 11px;
       border: 1px solid var(--border);
@@ -86,7 +86,7 @@
       font: inherit;
     }
 
-    input:focus, textarea:focus {
+    input:focus, textarea:focus, select:focus {
       outline: 2px solid rgba(96, 165, 250, 0.35);
       border-color: var(--primary);
     }
@@ -348,6 +348,24 @@
     <section>
       <h2>Try Redaction</h2>
       <p class="subtle">This uses the currently enabled rules from your `rules.json` file.</p>
+      <div class="help">
+        <strong>Modes</strong>: <code>replace</code> uses PII tokens, <code>mask</code> hides most characters but keeps some shape, <code>remove</code> deletes matches, and <code>hash</code> replaces each match with a deterministic SHA-256 digest.
+      </div>
+      <div class="grid" style="margin-bottom: 12px;">
+        <div>
+          <label for="redact-mode">Mode</label>
+          <select id="redact-mode">
+            <option value="replace">replace</option>
+            <option value="mask">mask</option>
+            <option value="remove">remove</option>
+            <option value="hash">hash</option>
+          </select>
+        </div>
+        <div>
+          <label for="hash-salt">Hash Salt</label>
+          <input id="hash-salt" placeholder="Optional, used only in hash mode">
+        </div>
+      </div>
       <label for="input-text">Input Text</label>
       <textarea id="input-text" placeholder="Email test@example.com and PAN ABCDE1234F"></textarea>
       <div class="actions" style="margin-top: 10px;">
@@ -379,7 +397,7 @@
         </div>
         <div>
           <label for="edit-enabled">Status</label>
-          <select id="edit-enabled" style="width: 100%; padding: 10px 11px; border: 1px solid var(--border); border-radius: 7px; background: #0b1220; color: var(--text); font: inherit;">
+          <select id="edit-enabled">
             <option value="true">Enabled</option>
             <option value="false">Disabled</option>
           </select>
@@ -539,11 +557,13 @@
 
     async function redactText() {
       const text = document.getElementById("input-text").value;
+      const mode = document.getElementById("redact-mode").value;
+      const hashSalt = document.getElementById("hash-salt").value;
       const output = document.getElementById("redact-output");
       try {
         const result = await request("/api/redact", {
           method: "POST",
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, mode, hash_salt: hashSalt }),
         });
         output.textContent = JSON.stringify(result, null, 2);
       } catch (error) {

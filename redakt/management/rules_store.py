@@ -3,13 +3,9 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Iterable
-
 from redakt.rules import DEFAULT_RULES, DetectionMethod, Rule
 
-
 class RuleStore:
-    """JSON-backed rule management for regex rules."""
-
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.rules: list[Rule] = []
@@ -18,7 +14,6 @@ class RuleStore:
         data = json.loads(self.path.read_text(encoding="utf-8"))
         if not isinstance(data, list):
             raise ValueError("rules.json must contain a list of rules")
-
         self.rules = [self._rule_from_dict(item) for item in data]
         return self.get_rules()
 
@@ -40,29 +35,14 @@ class RuleStore:
     def get_rules(self) -> list[Rule]:
         return copy.deepcopy(self.rules)
 
-    def add_regex_rule(
-        self,
-        label: str,
-        pattern: str,
-        description: str = "",
-        enabled: bool = True,
-        priority: int = 0,
-        replace: bool = True,
-    ) -> Rule:
+    def add_regex_rule(self, label: str, pattern: str, description: str = "", enabled: bool = True, priority: int = 0, replace: bool = True,) -> Rule:
         if not label:
             raise ValueError("label is required")
         if not pattern:
             raise ValueError("pattern is required")
 
         re.compile(pattern)
-        rule = Rule(
-            label=label,
-            pattern=pattern,
-            method=DetectionMethod.REGEX,
-            description=description,
-            enabled=enabled,
-            priority=priority,
-        )
+        rule = Rule(label=label, pattern=pattern, method=DetectionMethod.REGEX, description=description, enabled=enabled, priority=priority,)
         rule.compile()
 
         existing_index = self._find_index(label)
@@ -124,14 +104,7 @@ class RuleStore:
             raise ValueError("each regex rule requires label and pattern")
 
         re.compile(pattern)
-        rule = Rule(
-            label=label,
-            pattern=pattern,
-            method=method,
-            description=data.get("description", ""),
-            enabled=bool(data.get("enabled", True)),
-            priority=int(data.get("priority", 0)),
-        )
+        rule = Rule(label=label, pattern=pattern, method=method, description=data.get("description", ""), enabled=bool(data.get("enabled", True)), priority=int(data.get("priority", 0)),)
         rule.compile()
         return rule
 
@@ -139,7 +112,6 @@ class RuleStore:
     def _rule_to_dict(rule: Rule) -> dict[str, Any]:
         if rule.method != DetectionMethod.REGEX:
             raise ValueError("rules.json currently supports regex rules only")
-
         return {
             "label": rule.label,
             "pattern": rule.pattern,

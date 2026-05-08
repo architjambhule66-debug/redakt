@@ -17,6 +17,42 @@ def test_restore_returns_original_text() -> None:
     assert result.restore() == text
 
 
+def test_mask_mode_masks_email_and_pan() -> None:
+    result = Redactor(use_ner=False, mode="mask").redact("Email test@example.com and PAN ABCDE1234F")
+
+    assert result.redacted_text == "Email t***@example.com and PAN A****1234F"
+    assert result.token_map == {}
+    assert result.mode == "mask"
+
+
+def test_remove_mode_removes_matches() -> None:
+    result = Redactor(use_ner=False, mode="remove").redact("Email test@example.com")
+
+    assert result.redacted_text == "Email "
+    assert result.token_map == {}
+
+
+def test_hash_mode_is_deterministic_and_uses_salt() -> None:
+    first = Redactor(use_ner=False, mode="hash", hash_salt="alpha").redact("Email test@example.com")
+    second = Redactor(use_ner=False, mode="hash", hash_salt="alpha").redact("Email test@example.com")
+    different = Redactor(use_ner=False, mode="hash", hash_salt="beta").redact("Email test@example.com")
+
+    assert first.redacted_text == second.redacted_text
+    assert first.redacted_text.startswith("Email sha256:")
+    assert first.redacted_text != different.redacted_text
+
+
+def test_restore_raises_for_non_replace_modes() -> None:
+    result = Redactor(use_ner=False, mode="mask").redact("Email test@example.com")
+
+    try:
+        result.restore()
+    except ValueError as exc:
+        assert "replace mode" in str(exc)
+    else:
+        raise AssertionError("restore() should fail outside replace mode")
+
+
 def test_default_rules_find_indian_identifiers() -> None:
     result = Redactor(use_ner=False).redact("PAN ABCDE1234F Aadhaar 1234 5678 9012")
 

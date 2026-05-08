@@ -1,13 +1,19 @@
 import re
-import uuid 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List, Optional, Tuple, Callable
+from typing import Dict, List, Optional, Tuple, Callable
 from enum import Enum 
 
 class DetectionMethod(str, Enum):
     REGEX = "regex"
     NER = "ner"
     CUSTOM_FUNC = "custom_func"
+
+
+class RedactionMode(str, Enum):
+    REPLACE = "replace"
+    MASK = "mask"
+    REMOVE = "remove"
+    HASH = "hash"
 
 @dataclass
 class RedactionMatch:
@@ -51,6 +57,7 @@ class RedactionResult:
     original_text: str
     matches: List[RedactionMatch]
     token_map: Dict[str, str]
+    mode: str = RedactionMode.REPLACE.value
 
     @property
     def pii_count(self) -> int:
@@ -61,6 +68,8 @@ class RedactionResult:
         return list({m.label for m in self.matches})
 
     def restore(self, text: Optional[str] = None) -> str:
+        if self.mode != RedactionMode.REPLACE.value:
+            raise ValueError("restore() is only available in replace mode")
         t = text if text is not None else self.redacted_text
         for token, original in self.token_map.items():
             t = t.replace(token, original)

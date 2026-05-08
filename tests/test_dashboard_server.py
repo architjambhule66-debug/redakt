@@ -35,6 +35,28 @@ def test_add_custom_rule_and_redact(tmp_path) -> None:
     assert redact_response.json()["redacted_text"] == "Owner [PII_EMPLOYEE_ID_1]"
 
 
+def test_redact_supports_mask_mode(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    response = client.post("/api/redact", json={"text": "Email test@example.com", "mode": "mask"})
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "mask"
+    assert response.json()["redacted_text"] == "Email t***@example.com"
+
+
+def test_redact_supports_hash_mode_with_salt(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    first = client.post("/api/redact", json={"text": "Email test@example.com", "mode": "hash", "hash_salt": "alpha"})
+    second = client.post("/api/redact", json={"text": "Email test@example.com", "mode": "hash", "hash_salt": "alpha"})
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.json()["redacted_text"] == second.json()["redacted_text"]
+    assert first.json()["redacted_text"].startswith("Email sha256:")
+
+
 def test_disable_and_enable_rule(tmp_path) -> None:
     client = make_client(tmp_path)
 
