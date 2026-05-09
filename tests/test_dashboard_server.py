@@ -35,6 +35,27 @@ def test_add_custom_rule_and_redact(tmp_path) -> None:
     assert redact_response.json()["redacted_text"] == "Owner [PII_EMPLOYEE_ID_1]"
 
 
+def test_add_rule_persists_tuning_fields(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    response = client.post(
+        "/api/rules",
+        json={
+            "label": "DOB_DATE",
+            "pattern": r"\b\d{2}/\d{2}/\d{4}\b",
+            "score": 0.2,
+            "min_score": 0.45,
+            "context": ["dob", "birth"],
+        },
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["score"] == 0.2
+    assert body["min_score"] == 0.45
+    assert body["context"] == ["dob", "birth"]
+
+
 def test_redact_supports_mask_mode(tmp_path) -> None:
     client = make_client(tmp_path)
 
@@ -57,6 +78,18 @@ def test_redact_supports_hash_mode_with_salt(tmp_path) -> None:
     assert first.json()["redacted_text"].startswith("Email sha256:")
 
 
+def test_redact_returns_scored_match_metadata(tmp_path) -> None:
+    client = make_client(tmp_path)
+
+    response = client.post("/api/redact", json={"text": "Email test@example.com"})
+
+    assert response.status_code == 200
+    match = response.json()["matches"][0]
+    assert match["source"] == "regex"
+    assert match["score"] == 1.0
+    assert "Email addresses" in match["explanation"]
+
+
 def test_disable_and_enable_rule(tmp_path) -> None:
     client = make_client(tmp_path)
 
@@ -75,11 +108,14 @@ def test_update_rule(tmp_path) -> None:
     client = make_client(tmp_path)
     client.post("/api/rules", json={"label": "CODE", "pattern": r"OLD-\d+"})
 
-    response = client.patch("/api/rules/CODE", json={"pattern": r"NEW-\d+", "priority": 3})
+    response = client.patch("/api/rules/CODE", json={"pattern": r"NEW-\d+", "priority": 3, "score": 0.5, "min_score": 0.4, "context": ["code"]})
     redact_response = client.post("/api/redact", json={"text": "OLD-1 NEW-2"})
 
     assert response.status_code == 200
     assert response.json()["priority"] == 3
+    assert response.json()["score"] == 0.5
+    assert response.json()["min_score"] == 0.4
+    assert response.json()["context"] == ["code"]
     assert redact_response.json()["redacted_text"] == "OLD-1 [PII_CODE_1]"
 
 

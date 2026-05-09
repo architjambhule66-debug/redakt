@@ -24,6 +24,23 @@ class RedactionMatch:
     start: int
     end: int
     method: str
+    source: str = ""
+    score: float = 0.0
+    explanation: Optional[str] = None
+
+
+@dataclass
+class DetectionCandidate:
+    start: int
+    end: int
+    label: str
+    method: str
+    source: str
+    score: float
+    priority: int
+    min_score: float = 0.0
+    context: Tuple[str, ...] = ()
+    explanation: Optional[str] = None
 
 @dataclass
 class Rule:
@@ -35,6 +52,9 @@ class Rule:
     description: str = ""
     enabled: bool = True
     priority: int = 0
+    score: float = 1.0
+    min_score: float = 0.0
+    context: List[str] = field(default_factory=list)
     _compiled: Optional[re.Pattern] = field(default=None, init=False, repr=False, compare=False)
 
     def compile(self) -> None:
@@ -84,7 +104,14 @@ GLOBAL_RULES: list[Rule] = [
     Rule(label="IPV4", pattern=r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b", description="IPv4 addresses",),
     Rule(label="CREDIT_CARD", pattern=r"\b(?:\d[ \-]?){13,16}\b", description="Credit / debit card numbers (13–16 digits)",),
     Rule(label="SSN", pattern=r"\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b", description="US Social Security Numbers",),
-    Rule(label="DATE_OF_BIRTH", pattern=r"\b\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}\b", description="Dates (likely DOB when in context)",),
+    Rule(
+        label="DATE_OF_BIRTH",
+        pattern=r"\b\d{1,2}[/\-\.]\d{1,2}[/\-\.]\d{2,4}\b",
+        description="Dates when supported by DOB context",
+        score=0.2,
+        min_score=0.45,
+        context=["dob", "date of birth", "birth", "born"],
+    ),
     Rule(label="URL", pattern=r"https?://[^\s]+", description="HTTP/HTTPS URLs",),
     Rule(label="MAC_ADDRESS", pattern=r"\b(?:[0-9A-Fa-f]{2}[:\-]){5}[0-9A-Fa-f]{2}\b", description="MAC addresses",),
     Rule(label="PASSPORT", pattern=r"\b[A-Z]{1,2}\d{6,9}\b", description="Passport numbers (generic pattern)",),
@@ -103,9 +130,9 @@ INDIA_RULES: list[Rule] = [
 ]
 
 NER_RULES: list[Rule] = [
-    Rule(label="PERSON_NAME", method=DetectionMethod.NER, ner_entity="PERSON", description="Person names (via NER)", enabled=True,),
-    Rule(label="LOCATION", method=DetectionMethod.NER, ner_entity="GPE", description="Locations / geopolitical entities (via NER)", enabled=False,),
-    Rule(label="ORGANIZATION", method=DetectionMethod.NER, ner_entity="ORG", description="Organisation names (via NER)", enabled=False,),
+    Rule(label="PERSON_NAME", method=DetectionMethod.NER, ner_entity="PERSON", description="Person names (via spaCy NER)", enabled=True, min_score=0.8),
+    Rule(label="LOCATION", method=DetectionMethod.NER, ner_entity="GPE", description="Locations / geopolitical entities (via spaCy NER)", enabled=False, min_score=0.75),
+    Rule(label="ORGANIZATION", method=DetectionMethod.NER, ner_entity="ORG", description="Organisation names (via spaCy NER)", enabled=False, min_score=0.8),
 ]
 
 ALL_REGEX_RULES: list[Rule] = GLOBAL_RULES + INDIA_RULES
@@ -120,3 +147,22 @@ def _resolve_spans(spans: list[tuple[int, int, str, str, int]],) -> list[tuple[i
         if all(end <= existing[0] or start >= existing[1] for existing in resolved):
             resolved.append(span)
     return sorted(resolved, key=lambda x: x[0])
+
+
+def _resolve_candidates(candidates: list[DetectionCandidate]) -> list[DetectionCandidate]:
+    candidates = sorted(
+        candidates,
+        key=lambda candidate: (
+            -candidate.priority,
+            -candidate.score,
+            -(candidate.end - candidate.start),
+            candidate.start,
+        ),
+    )
+    resolved: list[DetectionCandidate] = []
+
+    for candidate in candidates:
+        if all(candidate.end <= existing.start or candidate.start >= existing.end for existing in resolved):
+            resolved.append(candidate)
+
+    return sorted(resolved, key=lambda candidate: candidate.start)

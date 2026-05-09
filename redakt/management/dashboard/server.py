@@ -21,6 +21,9 @@ class RulePayload(BaseModel):
     description: str = ""
     enabled: bool = True
     priority: int = 0
+    score: float = 1.0
+    min_score: float = 0.0
+    context: list[str] = Field(default_factory=list)
 
 
 class RuleUpdatePayload(BaseModel):
@@ -28,6 +31,9 @@ class RuleUpdatePayload(BaseModel):
     description: str | None = None
     enabled: bool | None = None
     priority: int | None = None
+    score: float | None = None
+    min_score: float | None = None
+    context: list[str] | None = None
 
 
 class RedactPayload(BaseModel):
@@ -62,6 +68,9 @@ def create_app(rules_path: str | Path | None = None) -> FastAPI:
                 description=payload.description,
                 enabled=payload.enabled,
                 priority=payload.priority,
+                score=payload.score,
+                min_score=payload.min_score,
+                context=payload.context,
                 replace=False,
             )
         except ValueError as exc:
@@ -82,6 +91,9 @@ def create_app(rules_path: str | Path | None = None) -> FastAPI:
                 description=payload.description if payload.description is not None else existing.description,
                 enabled=payload.enabled if payload.enabled is not None else existing.enabled,
                 priority=payload.priority if payload.priority is not None else existing.priority,
+                score=payload.score if payload.score is not None else existing.score,
+                min_score=payload.min_score if payload.min_score is not None else existing.min_score,
+                context=payload.context if payload.context is not None else existing.context,
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -150,6 +162,9 @@ def _rule_to_dict(rule: Rule) -> dict[str, Any]:
         "description": rule.description,
         "enabled": rule.enabled,
         "priority": rule.priority,
+        "score": rule.score,
+        "min_score": rule.min_score,
+        "context": rule.context,
         "builtin": any(default.label == rule.label for default in DEFAULT_RULES),
     }
 

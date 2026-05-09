@@ -20,6 +20,7 @@ Install optional NER support:
 
 ```bash
 pip install "redakt[ner]"
+python -m spacy download en_core_web_sm
 ```
 
 For local development:
@@ -128,6 +129,20 @@ Supported rule-store operations:
 
 `rules.json` currently supports regex rules only. Python callback detectors and NER rules are kept in code for now.
 
+NER rules use native spaCy entities rather than Presidio. The first-pass built-in NER entities are:
+
+- `PERSON_NAME`
+- `LOCATION`
+- `ORGANIZATION`
+
+Hybrid detection now supports rule scoring:
+
+- `score`: base confidence for a rule
+- `min_score`: minimum confidence required before a match is accepted
+- `context`: nearby words or phrases which can boost weak matches
+
+This is useful for weak regex entities such as dates of birth, where a plain date should not always be redacted unless it appears near words like `dob` or `birth`.
+
 ## Dashboard
 
 Install with the dashboard extra, then run the local dashboard:
@@ -205,6 +220,7 @@ Manage a `rules.json` file from the terminal:
 redakt rules init
 redakt rules list
 redakt rules add EMPLOYEE_ID 'EMP-\d{5}' --description "Employee IDs" --priority 5
+redakt rules add DOB_DATE '\b\d{2}/\d{2}/\d{4}\b' --score 0.2 --min-score 0.45 --context dob
 redakt rules disable AADHAAR
 redakt rules enable AADHAAR
 redakt rules remove EMPLOYEE_ID
@@ -224,6 +240,7 @@ Rule command notes:
 - `rules init` creates defaults and refuses to overwrite unless `--force` is used.
 - `rules list --json` prints machine-readable rule data.
 - `rules add --replace` updates an existing rule with the same label.
+- `rules add --score/--min-score/--context` lets you create weaker rules which only fire when context boosts them.
 - Higher `priority` wins when two rules match overlapping text.
 
 ## Run Tests

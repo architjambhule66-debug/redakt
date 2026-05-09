@@ -41,6 +41,26 @@ def test_rule_store_can_add_custom_regex_rule(tmp_path) -> None:
     assert result.matches[0].label == "EMPLOYEE_ID"
 
 
+def test_rule_store_persists_score_min_score_and_context(tmp_path) -> None:
+    path = tmp_path / "rules.json"
+    store = RuleStore(path)
+    store.load_or_create_defaults()
+
+    store.add_regex_rule(
+        "WEAK_DATE",
+        r"\b\d{2}/\d{2}/\d{4}\b",
+        score=0.2,
+        min_score=0.45,
+        context=["dob"],
+    )
+    loaded = RuleStore(path).load()
+    rule = next(rule for rule in loaded if rule.label == "WEAK_DATE")
+
+    assert rule.score == 0.2
+    assert rule.min_score == 0.45
+    assert rule.context == ["dob"]
+
+
 def test_rule_store_remove_rule(tmp_path) -> None:
     store = RuleStore(tmp_path / "rules.json")
     store.load_or_create_defaults()

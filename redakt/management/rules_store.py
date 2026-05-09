@@ -35,14 +35,35 @@ class RuleStore:
     def get_rules(self) -> list[Rule]:
         return copy.deepcopy(self.rules)
 
-    def add_regex_rule(self, label: str, pattern: str, description: str = "", enabled: bool = True, priority: int = 0, replace: bool = True,) -> Rule:
+    def add_regex_rule(
+        self,
+        label: str,
+        pattern: str,
+        description: str = "",
+        enabled: bool = True,
+        priority: int = 0,
+        score: float = 1.0,
+        min_score: float = 0.0,
+        context: list[str] | None = None,
+        replace: bool = True,
+    ) -> Rule:
         if not label:
             raise ValueError("label is required")
         if not pattern:
             raise ValueError("pattern is required")
 
         re.compile(pattern)
-        rule = Rule(label=label, pattern=pattern, method=DetectionMethod.REGEX, description=description, enabled=enabled, priority=priority,)
+        rule = Rule(
+            label=label,
+            pattern=pattern,
+            method=DetectionMethod.REGEX,
+            description=description,
+            enabled=enabled,
+            priority=priority,
+            score=score,
+            min_score=min_score,
+            context=list(context or []),
+        )
         rule.compile()
 
         existing_index = self._find_index(label)
@@ -104,7 +125,17 @@ class RuleStore:
             raise ValueError("each regex rule requires label and pattern")
 
         re.compile(pattern)
-        rule = Rule(label=label, pattern=pattern, method=method, description=data.get("description", ""), enabled=bool(data.get("enabled", True)), priority=int(data.get("priority", 0)),)
+        rule = Rule(
+            label=label,
+            pattern=pattern,
+            method=method,
+            description=data.get("description", ""),
+            enabled=bool(data.get("enabled", True)),
+            priority=int(data.get("priority", 0)),
+            score=float(data.get("score", 1.0)),
+            min_score=float(data.get("min_score", 0.0)),
+            context=list(data.get("context", [])),
+        )
         rule.compile()
         return rule
 
@@ -119,5 +150,8 @@ class RuleStore:
             "description": rule.description,
             "enabled": rule.enabled,
             "priority": rule.priority,
+            "score": rule.score,
+            "min_score": rule.min_score,
+            "context": rule.context,
             "builtin": any(default.label == rule.label for default in DEFAULT_RULES),
         }

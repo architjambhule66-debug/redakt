@@ -1,8 +1,12 @@
 import copy
 import hashlib
 from typing import List, Optional
-from redakt.rules import DEFAULT_RULES, DetectionMethod, RedactionMatch, RedactionMode, RedactionResult, Rule, _resolve_spans
+from redakt.rules import DEFAULT_RULES, DetectionCandidate, DetectionMethod, RedactionMatch, RedactionMode, RedactionResult, Rule, _resolve_candidates
 from redakt import ner as _ner
+
+
+_CONTEXT_WINDOW_CHARS = 40
+_CONTEXT_BOOST = 0.35
 
 class Redactor:
     def __init__(self, rules: Optional[List[Rule]] = None, token_format: str = "[PII_{label}_{n}]", use_ner: bool = True, ner_language: str = "en", mode: str = RedactionMode.REPLACE.value, hash_salt: str = "") -> None:
@@ -53,30 +57,39 @@ class Redactor:
                 original_text=text,
                 matches=[],
                 token_map={},
+                mode=self.mode.value,
             )
 
-        raw_spans: list[tuple[int, int, str, str, int]] = []
+        candidates: list[DetectionCandidate] = []
 
         for rule in self._rules:
             if not rule.enabled or rule.method == DetectionMethod.NER:
                 continue
             for start, end in rule.find_spans(text):
-                raw_spans.append((start, end, rule.label, rule.method.value, rule.priority))
+                candidates.append(
+                    DetectionCandidate(
+                        start=start,
+                        end=end,
+                        label=rule.label,
+                        method=rule.method.value,
+                        source=rule.method.value,
+                        score=rule.score,
+                        priority=rule.priority,
+                        min_score=rule.min_score,
+                        context=tuple(rule.context),
+                        explanation=rule.description or None,
+                    )
+                )
 
         if self.use_ner:
             ner_rules = [r for r in self._rules if r.enabled and r.method == DetectionMethod.NER and r.ner_entity]
             if ner_rules:
-                entity_types = [r.ner_entity for r in ner_rules]
-                ner_map = _ner.ner_spans(text, entity_types, self.ner_language)
-                entity_to_label = {r.ner_entity: r.label for r in ner_rules}
-                for entity, spans in ner_map.items():
-                    label = entity_to_label.get(entity, entity)
-                    for start, end in spans:
-                        raw_spans.append((start, end, label, "ner", 0))
+                candidates.extend(_ner.ner_candidates(text, ner_rules, self.ner_language))
 
-        resolved = _resolve_spans(raw_spans)
+        candidates = [self._apply_context_and_thresholds(text, candidate) for candidate in candidates]
+        candidates = [candidate for candidate in candidates if candidate.score >= candidate.min_score]
 
-        resolved.sort(key=lambda x: x[0])
+        resolved = _resolve_candidates(candidates)
 
         label_counters: dict[str, int] = {}
         token_map: dict[str, str] = {}
@@ -85,22 +98,25 @@ class Redactor:
 
         replacements: list[tuple[int, int, str]] = []
 
-        for start, end, label, method, _priority in resolved:
-            label_counters[label] = label_counters.get(label, 0) + 1
-            n = label_counters[label]
-            token = self.token_format.format(label=label, n=n)
-            original = text[start:end]
-            replacement = self._replacement_text(original, label, token)
+        for candidate in resolved:
+            label_counters[candidate.label] = label_counters.get(candidate.label, 0) + 1
+            n = label_counters[candidate.label]
+            token = self.token_format.format(label=candidate.label, n=n)
+            original = text[candidate.start:candidate.end]
+            replacement = self._replacement_text(original, candidate.label, token)
             if self.mode == RedactionMode.REPLACE:
                 token_map[token] = original
-            replacements.append((start, end, replacement))
+            replacements.append((candidate.start, candidate.end, replacement))
             matches.append(RedactionMatch(
                 original=original,
                 token=replacement,
-                label=label,
-                start=start,
-                end=end,
-                method=method,
+                label=candidate.label,
+                start=candidate.start,
+                end=candidate.end,
+                method=candidate.method,
+                source=candidate.source,
+                score=candidate.score,
+                explanation=candidate.explanation,
             ))
 
         for start, end, token in sorted(replacements, key=lambda x: x[0], reverse=True):
@@ -127,6 +143,36 @@ class Redactor:
             digest = hashlib.sha256(f"{self.hash_salt}{label}:{original}".encode("utf-8")).hexdigest()
             return f"sha256:{digest[:16]}"
         return _mask_value(original)
+
+    def _apply_context_and_thresholds(self, text: str, candidate: DetectionCandidate) -> DetectionCandidate:
+        if not candidate.context:
+            return candidate
+
+        window_start = max(0, candidate.start - _CONTEXT_WINDOW_CHARS)
+        window_end = min(len(text), candidate.end + _CONTEXT_WINDOW_CHARS)
+        context_window = text[window_start:window_end].lower()
+
+        for context_word in candidate.context:
+            if context_word.lower() in context_window:
+                boosted_score = min(1.0, candidate.score + _CONTEXT_BOOST)
+                explanation = candidate.explanation or ""
+                if explanation:
+                    explanation += "; "
+                explanation += f"context boost via '{context_word}'"
+                return DetectionCandidate(
+                    start=candidate.start,
+                    end=candidate.end,
+                    label=candidate.label,
+                    method=candidate.method,
+                    source=candidate.source,
+                    score=boosted_score,
+                    priority=candidate.priority,
+                    min_score=candidate.min_score,
+                    context=candidate.context,
+                    explanation=explanation,
+                )
+
+        return candidate
 
 
 def _mask_value(value: str) -> str:

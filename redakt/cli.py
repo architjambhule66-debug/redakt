@@ -46,6 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     rules_add_parser.add_argument("pattern", help="Regex pattern")
     rules_add_parser.add_argument("--description", default="", help="Rule description")
     rules_add_parser.add_argument("--priority", type=int, default=0, help="Priority for overlap resolution")
+    rules_add_parser.add_argument("--score", type=float, default=1.0, help="Base detection score")
+    rules_add_parser.add_argument("--min-score", type=float, default=0.0, help="Minimum score required after boosts")
+    rules_add_parser.add_argument("--context", action="append", default=[], help="Context word or phrase to boost weak matches")
     rules_add_parser.add_argument("--disabled", action="store_true", help="Add the rule disabled")
     rules_add_parser.add_argument("--replace", action="store_true", help="Replace an existing rule with the same label")
     rules_add_parser.set_defaults(func=_rules_add_command)
@@ -136,7 +139,10 @@ def _rules_list_command(args: argparse.Namespace) -> int:
             state = "enabled" if rule.enabled else "disabled"
             builtin = "built-in" if _is_builtin(rule) else "custom"
             description = f" - {rule.description}" if rule.description else ""
-            print(f"{rule.label}\t{state}\tpriority={rule.priority}\t{builtin}{description}")
+            context = f"\tcontext={','.join(rule.context)}" if rule.context else ""
+            print(
+                f"{rule.label}\t{state}\tpriority={rule.priority}\tscore={rule.score}\tmin_score={rule.min_score}\t{builtin}{context}{description}"
+            )
 
     return 0
 
@@ -152,6 +158,9 @@ def _rules_add_command(args: argparse.Namespace) -> int:
             description=args.description,
             enabled=not args.disabled,
             priority=args.priority,
+            score=args.score,
+            min_score=args.min_score,
+            context=args.context,
             replace=args.replace,
         )
     except (ValueError, re.PatternError) as exc:
@@ -220,6 +229,9 @@ def _rule_to_dict(rule: Rule) -> dict[str, Any]:
         "description": rule.description,
         "enabled": rule.enabled,
         "priority": rule.priority,
+        "score": rule.score,
+        "min_score": rule.min_score,
+        "context": rule.context,
         "builtin": _is_builtin(rule),
     }
 

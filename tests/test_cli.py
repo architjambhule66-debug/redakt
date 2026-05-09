@@ -120,7 +120,7 @@ def test_cli_rules_list_prints_plain_text(tmp_path, capsys) -> None:
 
     output = capsys.readouterr().out
     assert exit_code == 0
-    assert "EMAIL\tenabled\tpriority=0\tbuilt-in" in output
+    assert "EMAIL\tenabled\tpriority=0\tscore=1.0\tmin_score=0.0\tbuilt-in" in output
 
 
 def test_cli_rules_list_json(tmp_path, capsys) -> None:
@@ -156,6 +156,38 @@ def test_cli_rules_add_custom_rule_and_redact_with_it(tmp_path, capsys) -> None:
     assert "Added rule EMPLOYEE_ID" in add_output
     assert redact_exit == 0
     assert redact_output == "Owner [PII_EMPLOYEE_ID_1]"
+
+
+def test_cli_rules_add_weak_rule_with_context(tmp_path, capsys) -> None:
+    path = tmp_path / "rules.json"
+
+    exit_code = main([
+        "rules",
+        "--rules",
+        str(path),
+        "add",
+        "DOB_DATE",
+        r"\b\d{2}/\d{2}/\d{4}\b",
+        "--score",
+        "0.2",
+        "--min-score",
+        "0.45",
+        "--context",
+        "dob",
+    ])
+    capsys.readouterr()
+    main(["rules", "--rules", str(path), "disable", "DATE_OF_BIRTH"])
+    capsys.readouterr()
+    redact_no_context = main(["redact", "01/01/2000", "--rules", str(path)])
+    output_no_context = capsys.readouterr().out.strip()
+    redact_with_context = main(["redact", "dob 01/01/2000", "--rules", str(path)])
+    output_with_context = capsys.readouterr().out.strip()
+
+    assert exit_code == 0
+    assert redact_no_context == 0
+    assert output_no_context == "01/01/2000"
+    assert redact_with_context == 0
+    assert output_with_context == "dob [PII_DOB_DATE_1]"
 
 
 def test_cli_rules_add_disabled_rule(tmp_path, capsys) -> None:
